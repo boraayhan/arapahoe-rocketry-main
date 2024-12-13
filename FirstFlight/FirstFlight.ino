@@ -11,6 +11,7 @@ double aX, aY, aZ, wX, wY, wZ, temp, altitude, baseline, pressure;
 
 SFE_BMP180 bmp;
 Adafruit_MPU6050 mpu;
+File file;
 
 void setup(void) {
   Serial.begin(115200);
@@ -34,6 +35,10 @@ void setup(void) {
     Serial.println("BMP180 init fail (disconnected?)\n\n");
   }
   baseline = getPressure();
+  if (!SD.begin(4)) {
+    ReportFail("SD Hardware");
+    while (1); //
+  }
   delay(100);
 }
 
@@ -45,17 +50,28 @@ void loop() {
 
 void EvaluateState() {
   switch (state) {
-    case 0:  // doing nothing
+    case 0:  //On the ground, not armed
       Serial.println("Lazy rocket");
       break;
-    case 1:  // powered flight
+    case 1:  // Armed
       // code block
       break;
-    case 2:  // flight
+    case 2:  // Engine active
+      // activate pid?
       // code block
       break;
-    case 3:  // falling
-      // code block
+    case 3:  // Non-powered flight upward
+      //flying and keep stable 
+      Serial.println("Engine Ended");
+      break;
+    case 4: //Falling without parachute
+      //check alt
+      break;
+    case 5: //Falling witth parachute
+      break; 
+    case 6: //Just landed
+      break;
+    case 7: //ready to turn off
       break;
   }
 }
@@ -86,13 +102,30 @@ void PrintInfo() {
   delay(500);
 }
 
-void LogData() {
+void WriteToCard() {
   int sec = millis() / 1000;
   Serial.print(", seconds: ");
   Serial.print(sec);
   int min = sec / 60;
   Serial.print(", minutes: ");
   Serial.print(min);
+
+  File file = SD.open("data.csv", FILE_WRITE);
+  entry = [time, xa, xy, xz, alt, ground level, temp, psi];
+
+  entry2=["entry" + "=" time, xa, xy, xz, alt, ground level, temp, psi, state
+  "debuge data:" + "=" time, xa, xy, xz, wx, wy, wz, alt, ground level, temp, psi, state, ta]
+  if (file) {
+    file.println(entry);
+    file.close();
+    // print to the serial port too:
+    Serial.println(entry2);
+    
+  }
+  // if the file isn't open, pop up an error:
+  else {
+    Serial.println("error opening data.csv");
+  }
 }
 
 double getPressure() {
@@ -113,4 +146,20 @@ double getPressure() {
       }
     }
   }
+}
+
+void ReportFail(String cause)
+{
+  Serial.println("[ERROR]: " + cause + " has failed!");
+  //Write "{cause} has failed!" onto data card along with timestamp, etc too
+}
+
+void WipeData() //Be careful with this one lol
+{
+
+}
+
+void ResetAltitude() //sets the 0m altitude
+{
+
 }
