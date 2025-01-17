@@ -4,7 +4,7 @@
 
 #include <SPI.h>
 #include <Wire.h>
-int state = 0;
+int state = 0, arm = 1;
 double aX, aY, aZ, wX, wY, wZ, temp, altitude, baseline, pressure;
 //acceleration x, y, z, angular velocity x, y, z, rocket internal temperature (from accelerometer), pressure based altitude, ground level pressure, 
 //and current pressure (used for altitude calculation)
@@ -47,18 +47,34 @@ void loop() {
   /* Get new sensor events with the readings */
   PrintInfo();
 }
-
+int burn_time = 0
 void EvaluateState() {
   switch (state) {
     case 0:  //On the ground, not armed
-      Serial.println("Lazy rocket");
+      Serial.println("Rocket Initialized");
+      if(arm == 1)
+      {
+        state = 1;
+      }
       break;
     case 1:  // Armed
-      // code block
+      Serial.println("armed")
+      if(aY>1)
+      {
+        initTime = millis();
+        state = 2;
+      }
       break;
     case 2:  // Engine active
-      // activate pid?
-      // code block
+      burn_time = burn_time +1;
+      fps = burn_time/sec;
+       // eng is burning fuel at delta(time)=k
+      if(burn_time > 2*fps)
+      {
+        state = 3;
+        // if the eng as burned for x amount of fps then it progresses
+        // 2 * fps make it go by secends and not by fps
+      }
       break;
     case 3:  // Non-powered flight upward
       //flying and keep stable 
@@ -71,7 +87,7 @@ void EvaluateState() {
       break; 
     case 6: //Just landed
       break;
-    case 7: //ready to turn off
+    case 7: //ready to turn off1
       break;
   }
 }
