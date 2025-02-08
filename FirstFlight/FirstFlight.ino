@@ -1,5 +1,6 @@
 #define BURNTIME 1000
 #define PARACHUTE_DEPLOYMENT_DELAY 1000
+#define ERROR 1
 
 #include <Adafruit_MPU6050.h>
 #include <SD.h>
@@ -12,7 +13,8 @@ int state = 0, arm = 1;
 double aX, aY, aZ, wX, wY, wZ, temp, altitude, baseline, pressure;
 double prevalt1 = 0, prevalt2 = 0, prevalt3 = 0;
 double burn_time, initTime = 0, maxHeightTimestamp = 0;
-double agX = 0, agY = 0, agZ = 0;
+double agX[4] = {0,0,0,0}, agY[4] = {0,0,0,0}, agZ[4] = {0,0,0,0};
+double agAvgX, agAvgY, agAvgZ;
 //acceleration x, y, z, angular velocity x, y, z, rocket internal temperature (from accelerometer), pressure based altitude, ground level pressure, 
 //and current pressure (used for altitude calculation)
 
@@ -84,17 +86,24 @@ void EvaluateState() {
       //wipe data?
       if(arm == 1)
       {
-        agX = aX;
-        agY = aY;
-        agZ = aZ;
+        for(int i = 0; i < 4; i++){
+          GetSensors();
+          agX[i] = aX;
+          agY[i] = aY;
+          agZ[i] = aZ;
+          delay(30);
+        }
+        agAvgX = ((agX[0] + agX[1] + agX[2] + agX[3])/4);
+        agAvgY = ((agY[0] + agY[1] + agY[2] + agY[3])/4);
+        agAvgZ = ((agZ[0] + agZ[1] + agZ[2] + agZ[3])/4);
         baseline = getPressure();
         state = 1;
       }
       break;
     case 1:  // Armed
       Serial.println("armed");
-      //ResetAltitude()
-      if((pow(aX - agX,2) + pow(aY - agY,2) + pow(aZ - agZ,2)) > 1)
+      ResetAltitude()
+      if((pow(aX - agAvgX,2) + pow(aY - agAvgY,2) + pow(aZ - agAvgZ,2)) > 1)
       {
         initTime = millis();
         state = 2;
@@ -102,6 +111,7 @@ void EvaluateState() {
       break;
     case 2:  // Engine active
        // eng is burning fuel at delta(time)=k
+       state = 3;//No way to know if rocket is unpowered right now
       break;
     case 3:  // Non-powered fligh t upward
        //flying and keep stable 
@@ -119,7 +129,7 @@ void EvaluateState() {
       break;
     case 4: //Falling without parachut
     //x is alt target to parassute
-      if(millis()>maxHeightTimestamp+ PARACHUTE_DEPLOYMENT_DELAY)
+      if(millis()>maxHeightTimestamp + PARACHUTE_DEPLOYMENT_DELAY)
       {
         //pull the lever cronk
         //turn moter of paratute
@@ -129,9 +139,14 @@ void EvaluateState() {
     case 5: //Falling witth parachut
     // keep track of rec and get drive ready
     // fins can guild the rocket still!
+      if((a)titude > (prevalt3 - ERROR)) && (altitude < (prevalt3 + ERROR)){
+        state = 6;
+      }
       break; 
-    case 6: //Just lande
+    case 6: //Just land
     //stop rec
+      delay(50);
+      state = 7;
       break;
     case 7: //ready to turn off
       break;
@@ -149,9 +164,10 @@ void GetSensors() {
   wZ = g.gyro.z;
   temp = t.temperature;
   pressure = getPressure();
-  altitude = bmp.altitude(pressure,baseline);
+  prevalt3 = prevalt2;
   prevalt2 = prevalt1;
-  prevalt1 = altitude;  altitude = bmp.altitude(pressure,baseline);
+  prevalt1 = altitude;  
+  altitude = bmp.altitude(pressure,baseline);
 }
 
 void PrintInfo() {
@@ -192,12 +208,17 @@ void WriteToCard() {
 
 void WipeData() //Be careful with this one lol
 {
-
+  
 }
 
-void ResetAltitude() //sets the 0m altitude to current altitude
+void ResetAltitude(pressure) //sets the 0m altitude to current altitude
 {
-  
+  //alex
+  //Use the barometric formula to estimate the altitude: h = (1 - (P / P0)^(1/5.257)) × 44330 Here, 
+  // h is the altitude in meters, P is the pressure reading from the barometer
+  // P0 is the reference pressure reading at sea level.
+  float P0 = 1013.25 millibars (mb);
+  altitude = (1 - (pressure / P0)^(1/5.257)) × 44330;
 }
 
 void loop() {
