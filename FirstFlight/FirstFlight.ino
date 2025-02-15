@@ -1,14 +1,17 @@
 #define BURNTIME 1000
 #define PARACHUTE_DEPLOYMENT_DELAY 1000
 #define ERROR 1
+#define SERVO1_PIN 1 //for Parachute
+
 
 #include <Adafruit_MPU6050.h>
 #include <SD.h>
 #include <SFE_BMP180.h>
-
+#include <Servo.h>
 #include <SPI.h>
 #include <Wire.h>
 //gets fixed when in adneo runner
+
 int state = 0, arm = 1;
 double aX, aY, aZ, wX, wY, wZ, temp, altitude, baseline, pressure;
 double prevalt1 = 0, prevalt2 = 0, prevalt3 = 0;
@@ -76,6 +79,9 @@ void setup(void) {
     ReportFail("SD Hardware");
     while (1); //
   }*/
+
+  initServo();
+
   delay(100);
 }
 
@@ -97,6 +103,9 @@ void EvaluateState() {
         agAvgY = ((agY[0] + agY[1] + agY[2] + agY[3])/4);
         agAvgZ = ((agZ[0] + agZ[1] + agZ[2] + agZ[3])/4);
         baseline = getPressure();
+
+
+
         state = 1;
       }
       break;
@@ -131,7 +140,7 @@ void EvaluateState() {
     //x is alt target to parassute
       if(millis()>maxHeightTimestamp + PARACHUTE_DEPLOYMENT_DELAY)
       {
-        //pull the lever cronk
+        
         //turn moter of paratute
       }
       //check alt
@@ -220,6 +229,37 @@ void ResetAltitude(pressure) //sets the 0m altitude to current altitude
   float P0 = 1013.25 millibars (mb);
   altitude = (1 - (pressure / P0)^(1/5.257)) × 44330;
 }
+
+
+
+
+
+void initServo() {
+  static Servo servo1;  // Servo for parachute  
+  myServo.attach(SERVO1_PIN);  // Attaches the servo to the specified pin
+  servo1.write(0);
+}
+void incrementServo(Servo toChange, int anl) {
+  toChange.write(toChange);
+}
+
+
+
+ 
+  
+  
+  
+  
+  //#include <Servo.h>: Includes the Servo library, necessary for controlling servo motors.
+  //Servo myServo;: Creates a Servo object named myServo. You can name it differently if needed.
+  //myServo.attach(pin);: Attaches the servo to a specified digital pin (pin).
+  //myServo.write(angle);: Sets the servo position to a specified angle (angle), ranging from 0 to 180 degrees.
+  //myServo.writeMicroseconds(microseconds);: Controls the servo position by specifying the pulse width in microseconds. Typically, 1000 µs is 0 degrees, 2000 µs is 180 degrees, and 1500 µs is 90 degrees.
+  //myServo.read();: Reads the current angle of the servo (the last value written).
+  //myServo.attached();: Checks if the servo is attached to a pin, returning true or false.
+  //myServo.detach();: Detaches the servo from its pin, disabling control until it's attached again.
+
+
 
 void loop() {
   // put your main code here, to run repeatedly:
