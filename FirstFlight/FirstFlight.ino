@@ -1,8 +1,8 @@
 #define BURNTIME 1000
 #define PARACHUTE_DEPLOYMENT_DELAY 1000
 #define ERROR 1
-#define SERVO1_PIN 1 //for Parachute
-
+#define SERVO1_PIN 5 //for Parachute
+#define SERVO2_PIN 2 
 
 #include <Adafruit_MPU6050.h>
 #include <SD.h>
@@ -10,6 +10,7 @@
 #include <Servo.h>
 #include <SPI.h>
 #include <Wire.h>
+//#include <string>
 //gets fixed when in adneo runner
 
 int state = 0, arm = 1;
@@ -102,6 +103,12 @@ void EvaluateState() {
         agAvgX = ((agX[0] + agX[1] + agX[2] + agX[3])/4);
         agAvgY = ((agY[0] + agY[1] + agY[2] + agY[3])/4);
         agAvgZ = ((agZ[0] + agZ[1] + agZ[2] + agZ[3])/4);
+
+        
+        Serial.println((agAvgX));
+        Serial.println(agAvgY);
+        Serial.println(agAvgZ);
+
         baseline = getPressure();
 
 
@@ -111,7 +118,7 @@ void EvaluateState() {
       break;
     case 1:  // Armed
       Serial.println("armed");
-      ResetAltitude()
+      //ResetAltitude();
       if((pow(aX - agAvgX,2) + pow(aY - agAvgY,2) + pow(aZ - agAvgZ,2)) > 1)
       {
         initTime = millis();
@@ -148,7 +155,7 @@ void EvaluateState() {
     case 5: //Falling witth parachut
     // keep track of rec and get drive ready
     // fins can guild the rocket still!
-      if((a)titude > (prevalt3 - ERROR)) && (altitude < (prevalt3 + ERROR)){
+      if((altitude > (prevalt3 - ERROR)) && (altitude < (prevalt3 + ERROR))){
         state = 6;
       }
       break; 
@@ -188,9 +195,7 @@ void PrintInfo() {
   Serial.println(pow(pow(aX, 2) + pow(aY, 2) + pow(aZ, 2), .5));
   Serial.print("Relative Altitude (meters): ");
   Serial.println(altitude);
-  Serial.println(agX);
-  Serial.println(agY);
-  Serial.println(agZ);
+
   delay(500);
 }
 
@@ -220,28 +225,37 @@ void WipeData() //Be careful with this one lol
   
 }
 
-void ResetAltitude(pressure) //sets the 0m altitude to current altitude
+/* void ResetAltitude(pressure) //sets the 0m altitude to current altitude
 {
   //alex
   //Use the barometric formula to estimate the altitude: h = (1 - (P / P0)^(1/5.257)) × 44330 Here, 
   // h is the altitude in meters, P is the pressure reading from the barometer
   // P0 is the reference pressure reading at sea level.
   float P0 = 1013.25 millibars (mb);
-  altitude = (1 - (pressure / P0)^(1/5.257)) × 44330;
-}
+  altitude = (1 - (pressure / P0)^(1/5.257)) * 44330;
+}*/
 
 
 
 
 
 void initServo() {
-  static Servo servo1;  // Servo for parachute  
-  myServo.attach(SERVO1_PIN);  // Attaches the servo to the specified pin
+  static Servo servo1;  // Servo for parachute 
+  
+  servo1.attach(SERVO1_PIN);  // Attaches the servo to the specified pin
   servo1.write(0);
+
+  static Servo servo2;
+
+  servo2.attach(SERVO2_PIN);  // Attaches the servo to the specified pin
+  servo2.write(0);
+
+  delay(10);
+
+  Serial.println(servo1.read());
+  Serial.println(servo2.read());
 }
-void incrementServo(Servo toChange, int anl) {
-  toChange.write(toChange);
-}
+
 
 
 
@@ -249,16 +263,7 @@ void incrementServo(Servo toChange, int anl) {
   
   
   
-  
-  //#include <Servo.h>: Includes the Servo library, necessary for controlling servo motors.
-  //Servo myServo;: Creates a Servo object named myServo. You can name it differently if needed.
-  //myServo.attach(pin);: Attaches the servo to a specified digital pin (pin).
-  //myServo.write(angle);: Sets the servo position to a specified angle (angle), ranging from 0 to 180 degrees.
-  //myServo.writeMicroseconds(microseconds);: Controls the servo position by specifying the pulse width in microseconds. Typically, 1000 µs is 0 degrees, 2000 µs is 180 degrees, and 1500 µs is 90 degrees.
-  //myServo.read();: Reads the current angle of the servo (the last value written).
-  //myServo.attached();: Checks if the servo is attached to a pin, returning true or false.
-  //myServo.detach();: Detaches the servo from its pin, disabling control until it's attached again.
-
+ 
 
 
 void loop() {
