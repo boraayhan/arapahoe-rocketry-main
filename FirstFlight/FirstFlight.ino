@@ -1,24 +1,36 @@
-#define BURNTIME 1000
-#define PARACHUTE_DEPLOYMENT_DELAY 1000
-#define ERROR 1
+//Servo Constants
 #define SERVO1_PIN 5 //for Parachute
 #define SERVO2_PIN 2 
+#define INITPOS1 0 //0 < angle < 180
+#define INITPOS2 0
+#define FINALPOS1 90 //0 < angle < 180
+#define FINALPOS2 90
 
+//Rocket Constants
+#define BURNTIME 1000 //in ms
+#define PARACHUTE_DEPLOYMENT_DELAY 1000
+#define LAUNCH_ACCEL_THRESHOLD 15
+#define ALTITUDE_ERROR 1
+
+//Modules and Libraries
 #include <Adafruit_MPU6050.h>
 #include <SD.h>
 #include <SFE_BMP180.h>
 #include <Servo.h>
 #include <SPI.h>
 #include <Wire.h>
-//#include <string>
-//gets fixed when in adneo runner
 
 int state = 0, arm = 1;
 double aX, aY, aZ, wX, wY, wZ, temp, altitude, baseline, pressure;
 double prevalt1 = 0, prevalt2 = 0, prevalt3 = 0;
 double burn_time, initTime = 0, maxHeightTimestamp = 0;
 double agX[4] = {0,0,0,0}, agY[4] = {0,0,0,0}, agZ[4] = {0,0,0,0};
-double agAvgX, agAvgY, agAvgZ;
+double agMag[4] = {0,0,0,0};
+
+bool record = true;
+
+Servo servo1;
+Servo servo2;
 //acceleration x, y, z, angular velocity x, y, z, rocket internal temperature (from accelerometer), pressure based altitude, ground level pressure, 
 //and current pressure (used for altitude calculation)
 
@@ -89,8 +101,7 @@ void setup(void) {
 void EvaluateState() {
   switch (state) {
     case 0:  //On the ground, not armed
-      Serial.println("Rocket Initialized");
-      //wipe data?
+      Serial.println("Rocket Initialized. State: 1");
       if(arm == 1)
       {
         for(int i = 0; i < 4; i++){
@@ -98,73 +109,68 @@ void EvaluateState() {
           agX[i] = aX;
           agY[i] = aY;
           agZ[i] = aZ;
-          delay(30);
+          agMag[i] = pow((pow(agX[i],2) + pow(agY[i],2) + pow(agZ[i],2)),0.5);
+          delay(200);
         }
-        agAvgX = ((agX[0] + agX[1] + agX[2] + agX[3])/4);
-        agAvgY = ((agY[0] + agY[1] + agY[2] + agY[3])/4);
-        agAvgZ = ((agZ[0] + agZ[1] + agZ[2] + agZ[3])/4);
 
-        
-        Serial.println((agAvgX));
-        Serial.println(agAvgY);
-        Serial.println(agAvgZ);
+        Serial.println("Gravity Acceleration Magnitude :");
+        Serial.println((agMag[0] + agMag[1] + agMag[2] + agMag[3])/4);
 
         baseline = getPressure();
-
-
-
         state = 1;
       }
       break;
     case 1:  // Armed
-      Serial.println("armed");
+      Serial.println("Armed! State: 1");
       //ResetAltitude();
-      if((pow(aX - agAvgX,2) + pow(aY - agAvgY,2) + pow(aZ - agAvgZ,2)) > 1)
+      if((pow(pow(aX, 2) + pow(aY, 2) + pow(aZ, 2), .5)) > LAUNCH_ACCEL_THRESHOLD)
       {
         initTime = millis();
         state = 2;
       }
       break;
     case 2:  // Engine active
+        Serial.println("State: 2");
        // eng is burning fuel at delta(time)=k
-       state = 3;//No way to know if rocket is unpowered right now
+      if(millis() > (initTime + BURNTIME))
+      {
+        state = 3;
+      }
       break;
-    case 3:  // Non-powered fligh t upward
+    case 3:  // Non-powered flight upward
        //flying and keep stable 
-      Serial.println("Engine Ended");
-      //pa=pereveas alt, ca=current alt
-      if(prevalt3>altitude)
+        Serial.println("State: 3");
+      if(prevalt3 > altitude)
       {
         state = 4;
         maxHeightTimestamp = millis();
       }
-      else
-      {
-        //keep flying      
-      }
       break;
-    case 4: //Falling without parachut
+    case 4: //Falling without parachute
     //x is alt target to parassute
-      if(millis()>maxHeightTimestamp + PARACHUTE_DEPLOYMENT_DELAY)
+      Serial.println("State: 4");
+      if(millis() > (maxHeightTimestamp + PARACHUTE_DEPLOYMENT_DELAY))
       {
-        
-        //turn moter of paratute
+        parachuteOpen();
       }
       //check alt
       break;
-    case 5: //Falling witth parachut
+    case 5: //Falling with parachute
     // keep track of rec and get drive ready
     // fins can guild the rocket still!
-      if((altitude > (prevalt3 - ERROR)) && (altitude < (prevalt3 + ERROR))){
+      Serial.println("State: 5");
+      if((altitude > (prevalt3 - ALTITUDE_ERROR)) && (altitude < (prevalt3 + ALTITUDE_ERROR))){
         state = 6;
       }
       break; 
-    case 6: //Just land
-    //stop rec
+    case 6: //Just landed
+      Serial.println("State: 6");
       delay(50);
       state = 7;
       break;
     case 7: //ready to turn off
+      Serial.println("State: 7");
+      record = false;
       break;
   }
 }
@@ -195,7 +201,7 @@ void PrintInfo() {
   Serial.println(pow(pow(aX, 2) + pow(aY, 2) + pow(aZ, 2), .5));
   Serial.print("Relative Altitude (meters): ");
   Serial.println(altitude);
-
+  
   delay(500);
 }
 
@@ -235,20 +241,15 @@ void WipeData() //Be careful with this one lol
   altitude = (1 - (pressure / P0)^(1/5.257)) * 44330;
 }*/
 
-
-
-
-
 void initServo() {
-  static Servo servo1;  // Servo for parachute 
+    // Servo for parachute 
   
   servo1.attach(SERVO1_PIN);  // Attaches the servo to the specified pin
-  servo1.write(0);
+  servo1.write(INITPOS1);
 
-  static Servo servo2;
 
   servo2.attach(SERVO2_PIN);  // Attaches the servo to the specified pin
-  servo2.write(0);
+  servo2.write(INITPOS2);
 
   delay(10);
 
@@ -256,20 +257,17 @@ void initServo() {
   Serial.println(servo2.read());
 }
 
-
-
-
- 
-  
-  
-  
- 
-
+void parachuteOpen(){
+  servo1.write(FINALPOS1);
+  servo2.write(FINALPOS2);
+}
 
 void loop() {
   // put your main code here, to run repeatedly:
   /* Get new sensor events with the readings */
-  PrintInfo();
+  if(record) {
+    PrintInfo();
+  }
   EvaluateState();
   //WriteToCard();
 }
