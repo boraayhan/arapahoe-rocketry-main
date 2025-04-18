@@ -1,15 +1,15 @@
 //Servo Constants
 #define SERVO1_PIN 5 //for Parachute
 #define SERVO2_PIN 2 
-#define INITPOS1 0 //0 < angle < 180
+#define INITPOS1 120 //0 < angle < 180
 #define INITPOS2 0
-#define FINALPOS1 90 //0 < angle < 180
+#define FINALPOS1 30 //0 < angle < 180
 #define FINALPOS2 90
 
 //Rocket Constants
 #define BURNTIME 1000 //in ms
-#define PARACHUTE_DEPLOYMENT_DELAY 1000
-#define LAUNCH_ACCEL_THRESHOLD 15
+#define PARACHUTE_DEPLOYMENT_DELAY 3000 // Calculate using kinematics after making motor or use altitude check (ie 20 meters)
+#define LAUNCH_ACCEL_THRESHOLD 50
 #define ALTITUDE_ERROR 1
 
 //Modules and Libraries
@@ -66,6 +66,7 @@ void ReportFail(String cause)
 
 void setup(void) {
   Serial.begin(115200);
+  initServo();
   while (!Serial)
     delay(10);
   Serial.println("Adafruit MPU6050 test!");
@@ -93,7 +94,6 @@ void setup(void) {
     while (1); //
   }*/
 
-  initServo();
 
   delay(100);
 }
@@ -123,7 +123,7 @@ void EvaluateState() {
     case 1:  // Armed
       Serial.println("Armed! State: 1");
       //ResetAltitude();
-      if((pow(pow(aX, 2) + pow(aY, 2) + pow(aZ, 2), .5)) > LAUNCH_ACCEL_THRESHOLD)
+      if(((pow(pow(aX, 2) + pow(aY, 2) + pow(aZ, 2), .5)) - ((agMag[0] + agMag[1] + agMag[2] + agMag[3])/4)) > LAUNCH_ACCEL_THRESHOLD)
       {
         initTime = millis();
         state = 2;
@@ -152,6 +152,7 @@ void EvaluateState() {
       if(millis() > (maxHeightTimestamp + PARACHUTE_DEPLOYMENT_DELAY))
       {
         parachuteOpen();
+        state = 5;
       }
       //check alt
       break;
@@ -243,7 +244,7 @@ void WipeData() //Be careful with this one lol
 
 void initServo() {
     // Servo for parachute 
-  
+
   servo1.attach(SERVO1_PIN);  // Attaches the servo to the specified pin
   servo1.write(INITPOS1);
 
